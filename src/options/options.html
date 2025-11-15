@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cookie Sync - Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Cookie Sync Settings</h1>
+      <p class="subtitle">Configure target domains and storage services</p>
+    </header>
+
+    <form id="optionsForm">
+      <!-- Target Domains Section -->
+      <section class="config-section">
+        <h2>Target Domains</h2>
+        <div class="form-group">
+          <label for="targetDomains">
+            Domain(s) to sync cookies from
+            <span class="help-text">(comma-separated or one per line, e.g., binance.com, example.com)</span>
+          </label>
+          <textarea 
+            id="targetDomains" 
+            name="targetDomains" 
+            rows="3" 
+            placeholder="binance.com"
+            required
+          ></textarea>
+          <div id="domainError" class="error-message"></div>
+        </div>
+      </section>
+
+      <!-- Firebase Section -->
+      <section class="config-section">
+        <div class="section-header">
+          <h2>Firebase Storage</h2>
+          <label class="toggle">
+            <input type="checkbox" id="firebaseEnabled" name="firebaseEnabled">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div id="firebaseConfig" class="service-config">
+          <div class="form-group">
+            <label for="firebaseProjectId">Project ID</label>
+            <input type="text" id="firebaseProjectId" name="firebaseProjectId" placeholder="your-project-id">
+          </div>
+          <div class="form-group">
+            <label for="firebaseBucket">Storage Bucket</label>
+            <input type="text" id="firebaseBucket" name="firebaseBucket" placeholder="your-bucket.appspot.com">
+          </div>
+          <div class="form-group">
+            <label for="firebaseServiceAccountKey">Service Account Key (JSON)</label>
+            <textarea 
+              id="firebaseServiceAccountKey" 
+              name="firebaseServiceAccountKey" 
+              rows="6" 
+              placeholder='{"type": "service_account", ...}'
+            ></textarea>
+            <span class="help-text">Paste your Firebase service account JSON key</span>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="testFirebase" class="btn btn-test">Test Connection</button>
+            <button type="button" id="clearFirebase" class="btn btn-clear">Clear</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Supabase Section -->
+      <section class="config-section">
+        <div class="section-header">
+          <h2>Supabase Storage</h2>
+          <label class="toggle">
+            <input type="checkbox" id="supabaseEnabled" name="supabaseEnabled">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div id="supabaseConfig" class="service-config">
+          <div class="form-group">
+            <label for="supabaseUrl">Supabase URL</label>
+            <input type="url" id="supabaseUrl" name="supabaseUrl" placeholder="https://your-project.supabase.co">
+          </div>
+          <div class="form-group">
+            <label for="supabaseApiKey">API Key</label>
+            <input type="password" id="supabaseApiKey" name="supabaseApiKey" placeholder="your-api-key">
+          </div>
+          <div class="form-group">
+            <label for="supabaseBucket">Bucket Name</label>
+            <input type="text" id="supabaseBucket" name="supabaseBucket" placeholder="cookies">
+          </div>
+          <div class="form-actions">
+            <button type="button" id="testSupabase" class="btn btn-test">Test Connection</button>
+            <button type="button" id="clearSupabase" class="btn btn-clear">Clear</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- AWS S3 Section -->
+      <section class="config-section">
+        <div class="section-header">
+          <h2>AWS S3</h2>
+          <label class="toggle">
+            <input type="checkbox" id="awsEnabled" name="awsEnabled">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div id="awsConfig" class="service-config">
+          <div class="form-group">
+            <label for="awsAccessKeyId">Access Key ID</label>
+            <input type="text" id="awsAccessKeyId" name="awsAccessKeyId" placeholder="AKIAIOSFODNN7EXAMPLE">
+          </div>
+          <div class="form-group">
+            <label for="awsSecretAccessKey">Secret Access Key</label>
+            <input type="password" id="awsSecretAccessKey" name="awsSecretAccessKey" placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY">
+          </div>
+          <div class="form-group">
+            <label for="awsBucket">Bucket Name</label>
+            <input type="text" id="awsBucket" name="awsBucket" placeholder="my-cookie-bucket">
+          </div>
+          <div class="form-group">
+            <label for="awsRegion">Region</label>
+            <input type="text" id="awsRegion" name="awsRegion" placeholder="us-east-1" value="us-east-1">
+          </div>
+          <div class="form-actions">
+            <button type="button" id="testAWS" class="btn btn-test">Test Connection</button>
+            <button type="button" id="clearAWS" class="btn btn-clear">Clear</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Form Actions -->
+      <div class="form-footer">
+        <button type="submit" id="saveButton" class="btn btn-primary">Save Configuration</button>
+        <button type="button" id="resetButton" class="btn btn-secondary">Reset to Defaults</button>
+      </div>
+    </form>
+
+    <div id="messageArea" class="message-area"></div>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
+

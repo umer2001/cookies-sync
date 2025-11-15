@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cookie Sync</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Cookie Sync</h1>
+    </header>
+
+    <div class="status-section">
+      <div class="status-item">
+        <span class="status-label">Auto Sync:</span>
+        <label class="toggle">
+          <input type="checkbox" id="autoSyncToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+      
+      <div class="status-item" id="lastSyncStatus">
+        <span class="status-label">Last Sync:</span>
+        <span class="status-value" id="lastSyncTime">Never</span>
+      </div>
+    </div>
+
+    <div class="domains-section">
+      <div class="status-item">
+        <span class="status-label">Target Domains:</span>
+        <span class="status-value" id="targetDomains">-</span>
+      </div>
+    </div>
+
+    <div class="services-section">
+      <div class="status-label">Enabled Services:</div>
+      <div id="enabledServices" class="services-list">-</div>
+    </div>
+
+    <div class="actions-section">
+      <button id="syncButton" class="btn btn-primary">
+        <span id="syncButtonText">Sync Now</span>
+        <span id="syncSpinner" class="spinner hidden"></span>
+      </button>
+      <button id="optionsButton" class="btn btn-secondary">Options</button>
+    </div>
+
+    <div id="messageArea" class="message-area"></div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
+
