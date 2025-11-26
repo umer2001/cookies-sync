@@ -16,6 +16,9 @@ const lastSyncTime = document.getElementById('lastSyncTime');
 const targetDomains = document.getElementById('targetDomains');
 const enabledServices = document.getElementById('enabledServices');
 const messageArea = document.getElementById('messageArea');
+const monitoringModeValue = document.getElementById('monitoringModeValue');
+const apiPathsCount = document.getElementById('apiPathsCount');
+const apiPathsCountValue = document.getElementById('apiPathsCountValue');
 
 /**
  * Format timestamp to readable date
@@ -75,9 +78,34 @@ async function updateStatus() {
       lastSyncTime.style.color = '#666';
     }
 
-    // Update target domains
-    const domains = config.targetDomains || ['binance.com'];
+    // Update target domains and monitoring mode
+    const targetDomainsConfig = config.targetDomains || [{ domain: 'binance.com', apiPaths: [] }];
+    const domains = targetDomainsConfig.map(d => typeof d === 'string' ? d : d.domain);
     targetDomains.textContent = domains.join(', ');
+    
+    // Check monitoring mode
+    const hasApiPaths = targetDomainsConfig.some(d => {
+      const domainConfig = typeof d === 'string' ? { domain: d, apiPaths: [] } : d;
+      return domainConfig.apiPaths && domainConfig.apiPaths.length > 0;
+    });
+    
+    if (hasApiPaths) {
+      monitoringModeValue.textContent = 'API Path Monitoring';
+      monitoringModeValue.style.color = '#4a90e2';
+      
+      // Count total API paths
+      const totalApiPaths = targetDomainsConfig.reduce((sum, d) => {
+        const domainConfig = typeof d === 'string' ? { domain: d, apiPaths: [] } : d;
+        return sum + (domainConfig.apiPaths?.length || 0);
+      }, 0);
+      
+      apiPathsCount.style.display = 'flex';
+      apiPathsCountValue.textContent = `${totalApiPaths} path${totalApiPaths !== 1 ? 's' : ''}`;
+    } else {
+      monitoringModeValue.textContent = 'All Cookies';
+      monitoringModeValue.style.color = '#666';
+      apiPathsCount.style.display = 'none';
+    }
 
     // Update enabled services
     const services = [];

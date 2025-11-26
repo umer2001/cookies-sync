@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cookie Sync</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="container">
     <header>
@@ -20,7 +22,7 @@
           <span class="slider"></span>
         </label>
       </div>
-      
+
       <div class="status-item" id="lastSyncStatus">
         <span class="status-label">Last Sync:</span>
         <span class="status-value" id="lastSyncTime">Never</span>
@@ -31,6 +33,14 @@
       <div class="status-item">
         <span class="status-label">Target Domains:</span>
         <span class="status-value" id="targetDomains">-</span>
+      </div>
+      <div class="status-item" id="monitoringMode">
+        <span class="status-label">Monitoring Mode:</span>
+        <span class="status-value" id="monitoringModeValue">-</span>
+      </div>
+      <div class="status-item" id="apiPathsCount" style="display: none;">
+        <span class="status-label">API Paths:</span>
+        <span class="status-value" id="apiPathsCountValue">-</span>
       </div>
     </div>
 
@@ -52,5 +62,5 @@
 
   <script type="module" src="popup.js"></script>
 </body>
-</html>
 
+</html>

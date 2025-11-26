@@ -16,21 +16,20 @@
     <form id="optionsForm">
       <!-- Target Domains Section -->
       <section class="config-section">
-        <h2>Target Domains</h2>
-        <div class="form-group">
-          <label for="targetDomains">
-            Domain(s) to sync cookies from
-            <span class="help-text">(comma-separated or one per line, e.g., binance.com, example.com)</span>
-          </label>
-          <textarea 
-            id="targetDomains" 
-            name="targetDomains" 
-            rows="3" 
-            placeholder="binance.com"
-            required
-          ></textarea>
-          <div id="domainError" class="error-message"></div>
+        <h2>Target Domains & API Paths</h2>
+        <div class="help-text" style="margin-bottom: 15px;">
+          Configure domains and optionally specify API paths to monitor. If no API paths are specified, all cookies for the domain will be synced.
         </div>
+        
+        <div id="domainsContainer">
+          <!-- Domain configurations will be added here dynamically -->
+        </div>
+        
+        <button type="button" id="addDomainButton" class="btn btn-secondary" style="margin-top: 15px;">
+          + Add Domain
+        </button>
+        
+        <div id="domainError" class="error-message"></div>
       </section>
 
       <!-- Firebase Section -->

@@ -6,7 +6,8 @@
     "permissions": [
         "cookies",
         "storage",
-        "activeTab"
+        "activeTab",
+        "webRequest"
     ],
     "host_permissions": [
         "https://binance.com/*",

@@ -7,6 +7,7 @@ import { getFormattedCookiesByDomain } from '../utils/cookies.js';
 import { uploadAllDomainsToEnabledServices } from '../utils/storage.js';
 import { getConfig, getEnabledServices } from '../utils/config.js';
 import { setupCookieChangeListener, isCookieChangeForDomain } from '../utils/cookies.js';
+import { setupRequestMonitoring, setSyncTriggerCallback } from '../utils/api-monitor.js';
 
 // Debounce timer for automatic sync
 let autoSyncTimer = null;
@@ -38,8 +39,16 @@ async function performSync() {
       };
     }
 
-    // Calculate total cookie count
-    const totalCookieCount = domainCookies.reduce((sum, { cookieData }) => sum + cookieData.cookies.length, 0);
+    // Calculate total cookie count (handle both old and new format)
+    const totalCookieCount = domainCookies.reduce((sum, { cookieData }) => {
+      if (Array.isArray(cookieData.cookies)) {
+        // Old format: cookies is an array
+        return sum + cookieData.cookies.length;
+      } else {
+        // New format: cookies is an object
+        return sum + Object.keys(cookieData.cookies || {}).length;
+      }
+    }, 0);
 
     // Upload to enabled services (one file per domain)
     const uploadResults = await uploadAllDomainsToEnabledServices(domainCookies);
@@ -125,8 +134,13 @@ async function setupAutoSync() {
   setupCookieChangeListener(async (changeInfo) => {
     const currentConfig = await getConfig();
 
+    // Extract domain list from config (handle both old and new format)
+    const domains = (currentConfig.targetDomains || []).map(d => 
+      typeof d === 'string' ? d : d.domain
+    ).filter(Boolean);
+
     // Check if change is for a configured domain
-    if (!isCookieChangeForDomain(changeInfo, currentConfig.targetDomains || [])) {
+    if (!isCookieChangeForDomain(changeInfo, domains)) {
       return;
     }
 
@@ -154,13 +168,26 @@ async function setupAutoSync() {
 async function initialize() {
   console.log('Cookie Sync extension service worker initialized');
 
+  // Setup API request monitoring
+  setupRequestMonitoring();
+  
+  // Set sync trigger callback for API monitor
+  setSyncTriggerCallback(async () => {
+    const config = await getConfig();
+    if (config.autoSync) {
+      await performSync();
+    }
+  });
+
   // Setup auto-sync if enabled
   await setupAutoSync();
 
-  // Listen for config changes to update auto-sync
+  // Listen for config changes to update auto-sync and monitoring
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.config) {
       setupAutoSync();
+      // Reinitialize API monitoring when config changes
+      setupRequestMonitoring();
     }
   });
 }

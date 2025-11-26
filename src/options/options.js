@@ -2,12 +2,13 @@
  * Options Page Logic
  */
 
-import { getConfig, saveConfig, parseDomains, validateDomain } from '../utils/config.js';
+import { getConfig, saveConfig, validateDomain, validateApiPath } from '../utils/config.js';
 import { testFirebaseConnection, testSupabaseConnection, testAWSConnection } from '../utils/storage.js';
 
 // DOM Elements
 const form = document.getElementById('optionsForm');
-const targetDomainsInput = document.getElementById('targetDomains');
+const domainsContainer = document.getElementById('domainsContainer');
+const addDomainButton = document.getElementById('addDomainButton');
 const domainError = document.getElementById('domainError');
 
 // Firebase
@@ -43,6 +44,9 @@ const saveButton = document.getElementById('saveButton');
 const resetButton = document.getElementById('resetButton');
 const messageArea = document.getElementById('messageArea');
 
+// Domain configuration counter
+let domainCounter = 0;
+
 /**
  * Show message
  */
@@ -67,14 +71,306 @@ function toggleServiceConfig(serviceEnabled, serviceConfig) {
 }
 
 /**
+ * Create domain configuration UI
+ * @param {Object} domainConfig - Domain configuration object
+ * @param {number} index - Index for unique IDs
+ * @returns {HTMLElement} Domain config element
+ */
+function createDomainConfig(domainConfig = { domain: '', apiPaths: [] }, index = null) {
+  const id = index !== null ? index : domainCounter++;
+  const domain = domainConfig.domain || '';
+  const apiPaths = domainConfig.apiPaths || [];
+  
+  const domainDiv = document.createElement('div');
+  domainDiv.className = 'domain-config';
+  domainDiv.dataset.domainId = id;
+  
+  domainDiv.innerHTML = `
+    <div class="domain-config-header">
+      <h3>Domain Configuration</h3>
+      <button type="button" class="remove-domain-btn" data-domain-id="${id}">Remove</button>
+    </div>
+    
+    <div class="domain-input-group">
+      <input 
+        type="text" 
+        class="domain-input" 
+        data-domain-id="${id}"
+        placeholder="binance.com"
+        value="${domain}"
+        required
+      >
+    </div>
+    
+    <div class="api-paths-section">
+      <label style="font-weight: 500; display: block; margin-bottom: 8px;">
+        API Paths (Optional)
+        <span class="help-text" style="font-weight: normal;">Leave empty to sync all cookies. Use * for wildcards (e.g., /api/v3/*)</span>
+      </label>
+      
+      <div class="api-paths-list" data-domain-id="${id}">
+        ${apiPaths.map((path, pathIndex) => `
+          <div class="api-path-item" data-path-index="${pathIndex}">
+            <input 
+              type="text" 
+              class="api-path-input" 
+              data-domain-id="${id}"
+              data-path-index="${pathIndex}"
+              placeholder="/api/v3/account"
+              value="${path}"
+            >
+            <button type="button" class="remove-path-btn" data-domain-id="${id}" data-path-index="${pathIndex}">Remove</button>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="add-path-group">
+        <input 
+          type="text" 
+          class="new-api-path-input" 
+          data-domain-id="${id}"
+          placeholder="/api/v3/account or /api/v3/*"
+        >
+        <button type="button" class="add-path-btn" data-domain-id="${id}">Add Path</button>
+      </div>
+      <div class="wildcard-hint">Tip: Use * for wildcards (e.g., /api/v3/* matches all paths under /api/v3/)</div>
+    </div>
+  `;
+  
+  // Add event listeners
+  const removeDomainBtn = domainDiv.querySelector('.remove-domain-btn');
+  removeDomainBtn.addEventListener('click', () => removeDomain(id));
+  
+  const addPathBtn = domainDiv.querySelector('.add-path-btn');
+  addPathBtn.addEventListener('click', () => addApiPath(id));
+  
+  const newPathInput = domainDiv.querySelector('.new-api-path-input');
+  newPathInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addApiPath(id);
+    }
+  });
+  
+  // Add remove listeners for existing paths
+  domainDiv.querySelectorAll('.remove-path-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const pathIndex = parseInt(e.target.dataset.pathIndex);
+      removeApiPath(id, pathIndex);
+    });
+  });
+  
+  return domainDiv;
+}
+
+/**
+ * Add a new domain configuration
+ */
+function addDomain() {
+  const domainDiv = createDomainConfig();
+  domainsContainer.appendChild(domainDiv);
+}
+
+/**
+ * Remove a domain configuration
+ */
+function removeDomain(domainId) {
+  const domainDiv = domainsContainer.querySelector(`[data-domain-id="${domainId}"]`);
+  if (domainDiv) {
+    domainDiv.remove();
+  }
+  
+  // Ensure at least one domain exists
+  if (domainsContainer.children.length === 0) {
+    addDomain();
+  }
+}
+
+/**
+ * Add an API path to a domain
+ */
+function addApiPath(domainId) {
+  const domainDiv = domainsContainer.querySelector(`[data-domain-id="${domainId}"]`);
+  if (!domainDiv) return;
+  
+  const newPathInput = domainDiv.querySelector('.new-api-path-input');
+  const path = newPathInput.value.trim();
+  
+  if (!path) {
+    showMessage('Please enter an API path', 'error');
+    return;
+  }
+  
+  if (!validateApiPath(path)) {
+    showMessage('Invalid API path. Must start with / and can contain wildcards (*)', 'error');
+    return;
+  }
+  
+  const pathsList = domainDiv.querySelector('.api-paths-list');
+  const pathIndex = pathsList.children.length;
+  
+  const pathItem = document.createElement('div');
+  pathItem.className = 'api-path-item';
+  pathItem.dataset.pathIndex = pathIndex;
+  pathItem.innerHTML = `
+    <input 
+      type="text" 
+      class="api-path-input" 
+      data-domain-id="${domainId}"
+      data-path-index="${pathIndex}"
+      placeholder="/api/v3/account"
+      value="${path}"
+    >
+    <button type="button" class="remove-path-btn" data-domain-id="${domainId}" data-path-index="${pathIndex}">Remove</button>
+  `;
+  
+  const removeBtn = pathItem.querySelector('.remove-path-btn');
+  removeBtn.addEventListener('click', () => removeApiPath(domainId, pathIndex));
+  
+  pathsList.appendChild(pathItem);
+  newPathInput.value = '';
+}
+
+/**
+ * Remove an API path from a domain
+ */
+function removeApiPath(domainId, pathIndex) {
+  const domainDiv = domainsContainer.querySelector(`[data-domain-id="${domainId}"]`);
+  if (!domainDiv) return;
+  
+  const pathItem = domainDiv.querySelector(`[data-path-index="${pathIndex}"]`);
+  if (pathItem) {
+    pathItem.remove();
+    
+    // Reindex remaining paths
+    const pathsList = domainDiv.querySelector('.api-paths-list');
+    Array.from(pathsList.children).forEach((item, index) => {
+      item.dataset.pathIndex = index;
+      const input = item.querySelector('.api-path-input');
+      const btn = item.querySelector('.remove-path-btn');
+      if (input) {
+        input.dataset.pathIndex = index;
+      }
+      if (btn) {
+        btn.dataset.pathIndex = index;
+        btn.onclick = () => removeApiPath(domainId, index);
+      }
+    });
+  }
+}
+
+/**
+ * Validate domains configuration
+ */
+function validateDomains() {
+  const domainConfigs = Array.from(domainsContainer.children);
+  
+  if (domainConfigs.length === 0) {
+    domainError.textContent = 'At least one domain is required';
+    domainError.classList.add('show');
+    return false;
+  }
+  
+  const errors = [];
+  
+  domainConfigs.forEach((domainDiv, index) => {
+    const domainInput = domainDiv.querySelector('.domain-input');
+    const domain = domainInput.value.trim();
+    
+    if (!domain) {
+      errors.push(`Domain ${index + 1} is required`);
+      return;
+    }
+    
+    if (!validateDomain(domain)) {
+      errors.push(`Domain ${index + 1} (${domain}) is invalid`);
+      return;
+    }
+    
+    // Validate API paths
+    const pathInputs = domainDiv.querySelectorAll('.api-path-input');
+    pathInputs.forEach((pathInput, pathIndex) => {
+      const path = pathInput.value.trim();
+      if (path && !validateApiPath(path)) {
+        errors.push(`Domain ${index + 1}, API path ${pathIndex + 1} (${path}) is invalid`);
+      }
+    });
+  });
+  
+  if (errors.length > 0) {
+    domainError.textContent = errors.join('. ');
+    domainError.classList.add('show');
+    return false;
+  }
+  
+  domainError.classList.remove('show');
+  return true;
+}
+
+/**
+ * Get domain configurations from form
+ */
+function getDomainConfigs() {
+  const domainConfigs = [];
+  const domainDivs = Array.from(domainsContainer.children);
+  
+  domainDivs.forEach(domainDiv => {
+    const domainInput = domainDiv.querySelector('.domain-input');
+    const domain = domainInput.value.trim();
+    
+    if (!domain) return;
+    
+    const apiPaths = [];
+    const pathInputs = domainDiv.querySelectorAll('.api-path-input');
+    pathInputs.forEach(pathInput => {
+      const path = pathInput.value.trim();
+      if (path) {
+        apiPaths.push(path);
+      }
+    });
+    
+    domainConfigs.push({
+      domain,
+      apiPaths
+    });
+  });
+  
+  return domainConfigs;
+}
+
+/**
  * Load configuration into form
  */
 async function loadConfig() {
   try {
     const config = await getConfig();
 
-    // Load target domains
-    targetDomainsInput.value = (config.targetDomains || ['binance.com']).join(', ');
+    // Clear existing domains
+    domainsContainer.innerHTML = '';
+    
+    // Load domain configurations
+    const targetDomains = config.targetDomains || [{ domain: 'binance.com', apiPaths: [] }];
+    
+    // Handle migration from old format
+    const domainConfigs = targetDomains.map(item => {
+      if (typeof item === 'string') {
+        return { domain: item, apiPaths: [] };
+      }
+      return {
+        domain: item.domain || '',
+        apiPaths: Array.isArray(item.apiPaths) ? item.apiPaths : []
+      };
+    });
+    
+    domainConfigs.forEach((domainConfig, index) => {
+      const domainDiv = createDomainConfig(domainConfig, index);
+      domainsContainer.appendChild(domainDiv);
+    });
+    
+    // Ensure at least one domain
+    if (domainsContainer.children.length === 0) {
+      addDomain();
+    }
 
     // Load Firebase
     firebaseEnabled.checked = config.services.firebase?.enabled || false;
@@ -104,28 +400,6 @@ async function loadConfig() {
 }
 
 /**
- * Validate domains
- */
-function validateDomains() {
-  const input = targetDomainsInput.value.trim();
-  if (!input) {
-    domainError.textContent = 'At least one domain is required';
-    domainError.classList.add('show');
-    return false;
-  }
-
-  const domains = parseDomains(input);
-  if (domains.length === 0) {
-    domainError.textContent = 'No valid domains found. Please enter valid domain names (e.g., binance.com)';
-    domainError.classList.add('show');
-    return false;
-  }
-
-  domainError.classList.remove('show');
-  return true;
-}
-
-/**
  * Save configuration
  */
 async function saveConfiguration() {
@@ -133,10 +407,15 @@ async function saveConfiguration() {
     return;
   }
 
-  const domains = parseDomains(targetDomainsInput.value);
+  const domainConfigs = getDomainConfigs();
+  
+  if (domainConfigs.length === 0) {
+    showMessage('At least one domain is required', 'error');
+    return;
+  }
 
   const config = {
-    targetDomains: domains,
+    targetDomains: domainConfigs,
     autoSync: false, // Will be set from popup
     services: {
       firebase: {
@@ -178,7 +457,9 @@ async function resetToDefaults() {
     return;
   }
 
-  targetDomainsInput.value = 'binance.com';
+  // Clear domains
+  domainsContainer.innerHTML = '';
+  addDomain();
   domainError.classList.remove('show');
 
   // Reset Firebase
@@ -349,6 +630,7 @@ form.addEventListener('submit', (e) => {
 });
 
 resetButton.addEventListener('click', resetToDefaults);
+addDomainButton.addEventListener('click', addDomain);
 
 // Service toggles
 firebaseEnabled.addEventListener('change', () => {
@@ -371,13 +653,14 @@ clearFirebaseBtn.addEventListener('click', clearFirebase);
 clearSupabaseBtn.addEventListener('click', clearSupabase);
 clearAWSBtn.addEventListener('click', clearAWS);
 
-// Domain validation
-targetDomainsInput.addEventListener('input', () => {
-  if (domainError.classList.contains('show')) {
-    validateDomains();
+// Domain validation on input
+domainsContainer.addEventListener('input', (e) => {
+  if (e.target.classList.contains('domain-input') || e.target.classList.contains('api-path-input')) {
+    if (domainError.classList.contains('show')) {
+      validateDomains();
+    }
   }
 });
 
 // Initialize
 loadConfig();
-

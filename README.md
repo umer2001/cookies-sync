@@ -4,8 +4,10 @@ A Chrome/Chromium browser extension that syncs cookies from configured websites 
 
 ## Features
 
-- 🔄 **Manual & Automatic Sync**: Sync cookies on-demand or automatically when cookies change
+- 🔄 **Manual & Automatic Sync**: Sync cookies on-demand or automatically when cookies/headers change
 - 🌐 **Configurable Domains**: Choose which websites to sync cookies from (default: binance.com)
+- 🎯 **API Path Monitoring**: Optionally monitor specific API endpoints and capture request headers and cookies
+- ⭐ **Wildcard Support**: Use wildcards in API paths (e.g., `/api/v3/*`) to match multiple endpoints
 - ☁️ **Multiple Storage Services**: Support for Firebase Storage, Supabase Storage, and AWS S3
 - 🔒 **Secure**: Credentials stored locally in browser storage
 - ⚙️ **Easy Configuration**: User-friendly options page for setup
@@ -62,18 +64,32 @@ A Chrome/Chromium browser extension that syncs cookies from configured websites 
 2. Click "Options" to open the configuration page
 3. Configure your target domains and storage services
 
-### Target Domains
+### Target Domains & API Paths
 
-- Enter domain(s) to sync cookies from (comma-separated or one per line)
-- Default: `binance.com`
-- Examples:
-  - Single domain: `binance.com`
-  - Multiple domains: `binance.com, example.com`
-  - One per line:
-    ```
-    binance.com
-    example.com
-    ```
+The extension supports two monitoring modes:
+
+#### Mode 1: All Cookies (Default)
+- If no API paths are configured, the extension syncs all cookies for the domain
+- Works exactly like the original behavior
+
+#### Mode 2: API Path Monitoring (New)
+- Configure specific API paths to monitor per domain
+- Only captures request headers and cookies from requests matching those paths
+- Syncs automatically when headers or cookies change for those requests
+
+**Configuration:**
+1. Click "Add Domain" to add a new domain configuration
+2. Enter the domain name (e.g., `binance.com`)
+3. (Optional) Add API paths to monitor:
+   - Click "Add Path" for each API endpoint
+   - Enter paths like `/api/v3/account`, `/api/v3/order`
+   - Use wildcards: `/api/v3/*` matches all paths under `/api/v3/`
+4. Leave API paths empty to sync all cookies (Mode 1)
+
+**Examples:**
+- Domain: `binance.com`, API Paths: `/api/v3/account`, `/api/v3/order`
+- Domain: `binance.com`, API Paths: `/api/v3/*` (matches all `/api/v3/` endpoints)
+- Domain: `example.com`, API Paths: (empty) - syncs all cookies
 
 ### Firebase Storage Setup
 
@@ -157,18 +173,26 @@ A Chrome/Chromium browser extension that syncs cookies from configured websites 
 
 1. Open the extension popup
 2. Toggle "Auto Sync" to enable
-3. Cookies will automatically sync when they change (with 5-second debounce)
+3. **All Cookies Mode**: Cookies will automatically sync when they change (with 5-second debounce)
+4. **API Path Monitoring Mode**: Sync triggers when:
+   - Request headers change for any monitored API path
+   - Cookies in requests change for any monitored API path
+   - Changes are detected with 2-second debounce
 
 ### Viewing Sync Status
 
 - **Last Sync**: Shows when the last sync occurred
 - **Target Domains**: Displays configured domains
+- **Monitoring Mode**: Shows "All Cookies" or "API Path Monitoring"
+- **API Paths**: Displays count of configured API paths (when in API Path Monitoring mode)
 - **Enabled Services**: Shows which storage services are active
 - **Status Indicators**: Green for success, red for errors
 
 ## Storage Format
 
-Cookies are stored as JSON files with the following structure:
+The storage format depends on the monitoring mode:
+
+### All Cookies Mode (No API Paths)
 
 ```json
 {
@@ -190,20 +214,44 @@ Cookies are stored as JSON files with the following structure:
 }
 ```
 
+### API Path Monitoring Mode
+
+```json
+{
+  "timestamp": 1234567890123,
+  "cookies": {
+    "cookie_name": "cookie_value",
+    "another_cookie": "another_value"
+  },
+  "headers": {
+    "authorization": "Bearer token123",
+    "x-api-key": "key456",
+    "content-type": "application/json"
+  }
+}
+```
+
 **File Naming:**
 - Files are named using the domain: `[domain].json`
 - Example: `binance.com.json`, `example.com.json`
 - Each domain gets its own file
 - If multiple domains are configured, separate files are created for each domain
-- Files are overwritten on each sync (latest cookies replace previous ones)
+- Files are overwritten on each sync (latest data replaces previous)
+
+**Notes:**
+- In API Path Monitoring mode, cookies and headers are combined from all monitored API paths
+- Header names are normalized to lowercase
+- Cookie values are extracted from the `Cookie` header in requests
 
 ## Security & Privacy
 
 - **Local Storage**: All credentials are stored locally in your browser using `chrome.storage.local`
 - **No External Servers**: The extension only communicates with your configured storage services
 - **HTTPS Only**: All API calls use HTTPS
-- **Input Validation**: Domain inputs are validated to prevent security issues
-- **No Cookie Modification**: The extension only reads cookies, never modifies them
+- **Input Validation**: Domain and API path inputs are validated to prevent security issues
+- **No Cookie Modification**: The extension only reads cookies and headers, never modifies them
+- **Request Monitoring**: The extension uses Chrome's `webRequest` API to monitor network requests (requires permission)
+- **Sensitive Data**: Be aware that request headers may contain sensitive information (API keys, tokens, etc.)
 
 ### Best Practices
 
@@ -251,7 +299,16 @@ Cookies are stored as JSON files with the following structure:
 - Ensure auto-sync is enabled in the popup
 - Check that at least one storage service is enabled
 - Verify target domains are configured
+- **For API Path Monitoring**: Ensure API paths are correctly configured and requests are being made
 - Check browser console for errors
+
+### API Path Monitoring Not Working
+
+- Verify API paths are correctly formatted (must start with `/`)
+- Check that requests are actually being made to those paths
+- Ensure wildcard patterns are correct (e.g., `/api/v3/*`)
+- Check browser console for monitoring errors
+- Verify `webRequest` permission is granted
 
 ## Development
 
